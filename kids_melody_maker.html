@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kids Melody Maker – 4-Bar Pages + Drum Loop</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f2f7ff;
+      text-align: center;
+      padding: 20px;
+    }
+    h1 { color: #333; margin-bottom: 6px; }
+    h2 { color: #333; margin: 22px 0 10px; }
+    p { margin-top: 0; }
+
+    .controls {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin: 12px 0 16px;
+    }
+
+    .chip {
+      background: white;
+      border: 1px solid #d9e2ff;
+      border-radius: 999px;
+      padding: 8px 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    label {
+      font-size: 14px;
+      color: #333;
+    }
+
+    input[type="range"] {
+      width: 240px;
+    }
+
+    select {
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid #c9d6ff;
+      background: #fff;
+      font-size: 14px;
+    }
+
+    button {
+      padding: 12px 18px;
+      font-size: 16px;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+      background: #4f7cff;
+      color: white;
+    }
+    button:hover { background: #365edc; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .hint {
+      font-size: 14px;
+      color: #444;
+      margin-top: 8px;
+    }
+
+    .rollWrap {
+      display: flex;
+      justify-content: center;
+      align-items: stretch;
+      gap: 10px;
+      margin: 0 auto;
+      max-width: 95vw;
+    }
+
+    .frame {
+      background: white;
+      border: 2px solid #ccc;
+      border-radius: 10px;
+      box-sizing: border-box;
+    }
+
+    .noteLabels {
+      width: 88px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-sizing: border-box;
+    }
+
+    .noteLabel {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      border-bottom: 1px solid #eee;
+      user-select: none;
+    }
+
+    canvas {
+      display: block;
+      background: white;
+      border-radius: 8px;
+    }
+
+    .headerCanvas {
+      border-bottom: 1px solid #eee;
+      border-radius: 8px 8px 0 0;
+    }
+
+    .gridCanvas {
+      border-radius: 0 0 8px 8px;
+    }
+
+    .labelHeaderSpacer {
+      height: 32px;
+      border-bottom: 1px solid #eee;
+      border-radius: 10px 10px 0 0;
+      box-sizing: border-box;
+      background: #fff;
+    }
+
+    .section {
+      margin-top: 18px;
+    }
+
+    .pager {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      margin: 10px 0 6px;
+    }
+
+    .pill {
+      background: white;
+      border: 1px solid #d9e2ff;
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 14px;
+      color: #222;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Kids Melody Maker</h1>
+  
+
+  <div class="controls">
+    <div class="chip" title="Tempo">
+      <span aria-hidden="true">🐢</span>
+      <label for="tempo">Tempo</label>
+      <input id="tempo" type="range" min="50" max="160" value="90" />
+      <span id="tempoValue">90</span>
+      <span aria-hidden="true">🐇</span>
+    </div>
+
+    <div class="chip" title="Note range">
+      <label for="range">Melody Range</label>
+      <select id="range">
+        <option value="oneOctave" selected>One Octave (C–B)</option>
+        <option value="twoOctaves">Two Octaves (C–B–C)</option>
+        <option value="beginner">Beginner (C–A)</option>
+      </select>
+    </div>
+
+    <button id="playBtn" onclick="playAll()">▶ Play</button>
+    <button id="stopBtn" onclick="stopPlayback()" disabled>⏹ Stop</button>
+    <button onclick="clearAll()">🗑 Clear</button>
+  </div>
+
+  <!-- Melody piano roll (paged) -->
+  <div class="section">
+    <h2>Melody</h2>
+    <div class="pager">
+      <button id="prevBtn" onclick="prevPage()">◀ Prev</button>
+      <div id="pagePill" class="pill">Bars 1–4 (Page 1/4)</div>
+      <button id="nextBtn" onclick="nextPage()">Next ▶</button>
+    </div>
+
+    <div class="rollWrap">
+      <div class="frame" aria-label="Note names">
+        <div class="labelHeaderSpacer" aria-hidden="true"></div>
+        <div id="noteLabels" class="noteLabels"></div>
+      </div>
+      <div class="frame" aria-label="Piano roll">
+        <canvas id="barHeader" class="headerCanvas" height="32" aria-label="Bar numbers"></canvas>
+        <canvas id="pianoRoll" class="gridCanvas" height="280"></canvas>
+      </div>
+    </div>
+
+    
+  </div>
+
+  <!-- Drum machine (always 4 bars) -->
+  <div class="section">
+    <h2>Drum Machine</h2>
+    <div class="rollWrap">
+      <div class="frame" aria-label="Drum names">
+        <div class="labelHeaderSpacer" aria-hidden="true"></div>
+        <div id="drumLabels" class="noteLabels"></div>
+      </div>
+      <div class="frame" aria-label="Drum grid">
+        <canvas id="drumHeader" class="headerCanvas" height="32" aria-label="Bar numbers"></canvas>
+        <canvas id="drumGrid" class="gridCanvas" height="120"></canvas>
+      </div>
+    </div>
+    
+  </div>
+
+  <script>
+    // ===== Audio =====
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    const frequencies = {
+      C4: 261.63,
+      D4: 293.66,
+      E4: 329.63,
+      F4: 349.23,
+      G4: 392.0,
+      A4: 440.0,
+      B4: 493.88,
+
+      C5: 523.25,
+      D5: 587.33,
+      E5: 659.25,
+      F5: 698.46,
+      G5: 783.99,
+      A5: 880.0,
+      B5: 987.77
+    };
+
+    // ===== Timing / Grid =====
+    // Each column = SIXTEENTH note. In 4/4: 1 bar = 16 sixteenths.
+    const stepsPerBar = 16;
+    const beatSteps = 4; // 4 sixteenths = 1 beat
+
+    const melodyBarsTotal = 16;
+    const pageBars = 4;
+    const melodyPages = melodyBarsTotal / pageBars; // 4 pages
+
+    const drumBars = 4; // always 4-bar loop
+
+    const melodyColsTotal = melodyBarsTotal * stepsPerBar; // 256
+    const pageSteps = pageBars * stepsPerBar;             // 64
+    const drumCols = drumBars * stepsPerBar;              // 64
+
+    // Choose a per-step pixel size that fits well on screen for 4 bars (64 steps)
+    const stepPx = 20;
+
+    // ===== UI =====
+    const tempoSlider = document.getElementById('tempo');
+    const tempoValue = document.getElementById('tempoValue');
+    const rangeSelect = document.getElementById('range');
+
+    const playBtn = document.getElementById('playBtn');
+    const stopBtn = document.getElementById('stopBtn');
+
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const pagePill = document.getElementById('pagePill');
+
+    tempoSlider.addEventListener('input', () => {
+      tempoValue.textContent = tempoSlider.value;
+    });
+
+    function getStepDurationSeconds() {
+      const bpm = Number(tempoSlider.value);
+      // BPM = quarter notes/min; sixteenth = quarter/4
+      return (60 / bpm) / 4;
+    }
+
+    // ===== Melody canvases =====
+    const noteLabelsEl = document.getElementById('noteLabels');
+    const barCanvas = document.getElementById('barHeader');
+    const barCtx = barCanvas.getContext('2d');
+    const melodyCanvas = document.getElementById('pianoRoll');
+    const melodyCtx = melodyCanvas.getContext('2d');
+
+    // ===== Drum canvases =====
+    const drumLabelsEl = document.getElementById('drumLabels');
+    const drumHeaderCanvas = document.getElementById('drumHeader');
+    const drumHeaderCtx = drumHeaderCanvas.getContext('2d');
+    const drumCanvas = document.getElementById('drumGrid');
+    const drumCtx = drumCanvas.getContext('2d');
+
+    // Fixed widths: no scrolling. Melody shows only 4 bars (pageSteps).
+    const pageWidth = pageSteps * stepPx;
+    barCanvas.width = pageWidth;
+    melodyCanvas.width = pageWidth;
+
+    drumHeaderCanvas.width = pageWidth;
+    drumCanvas.width = pageWidth;
+
+    // ===== Range modes (melody) =====
+    const rangeModes = {
+      oneOctave: ['B4','A4','G4','F4','E4','D4','C4'],
+      twoOctaves: ['B5','A5','G5','F5','E5','D5','C5','B4','A4','G4','F4','E4','D4','C4'],
+      beginner: ['A4','G4','F4','E4','D4','C4']
+    };
+
+    rangeSelect.addEventListener('change', () => {
+      setRange(rangeSelect.value);
+    });
+
+    // ===== State =====
+    let isPlaying = false;
+    let playStartAudio = 0;
+    let animationId = null;
+
+    // Page state
+    let pageIndex = 0; // 0..3
+
+    // Melody grid state (stores ALL 16 bars)
+    let notes = rangeModes.oneOctave.slice();
+    let melodyRows = notes.length;
+    const rowH = 40;
+    melodyCanvas.height = rowH * melodyRows;
+
+    let melodyCellW = melodyCanvas.width / pageSteps; // per step on current page
+    let melodyCellH = melodyCanvas.height / melodyRows;
+
+    let melodyData = Array.from({ length: melodyRows }, () => Array(melodyColsTotal).fill(false));
+
+    // Drum grid state (4 bars, shown fully)
+    const drums = ['Hi-hat', 'Snare', 'Kick']; // top -> bottom
+    const drumRows = drums.length;
+    drumCanvas.height = rowH * drumRows;
+
+    let drumCellW = drumCanvas.width / drumCols;
+    let drumCellH = drumCanvas.height / drumRows;
+
+    let drumData = Array.from({ length: drumRows }, () => Array(drumCols).fill(false));
+
+    // ===== Labels =====
+    function renderVerticalLabels(el, labels, canvasHeight, cellH) {
+      el.innerHTML = '';
+      el.style.height = `${canvasHeight}px`;
+      for (let i = 0; i < labels.length; i++) {
+        const div = document.createElement('div');
+        div.className = 'noteLabel';
+        div.style.height = `${cellH}px`;
+        div.style.flex = `0 0 ${cellH}px`;
+        div.textContent = labels[i];
+        el.appendChild(div);
+      }
+    }
+
+    function renderMelodyLabels() {
+      renderVerticalLabels(noteLabelsEl, notes, melodyCanvas.height, melodyCellH);
+    }
+
+    function renderDrumLabels() {
+      renderVerticalLabels(drumLabelsEl, drums, drumCanvas.height, drumCellH);
+    }
+
+    // ===== Page helpers =====
+    function pageStartStep() {
+      return pageIndex * pageSteps;
+    }
+
+    function updatePagerUI() {
+      const startBar = pageIndex * pageBars + 1;
+      const endBar = startBar + pageBars - 1;
+      pagePill.textContent = `Bars ${startBar}–${endBar} (Page ${pageIndex + 1}/${melodyPages})`;
+      prevBtn.disabled = (pageIndex === 0) || isPlaying;
+      nextBtn.disabled = (pageIndex === melodyPages - 1) || isPlaying;
+    }
+
+    function goToPage(idx) {
+      pageIndex = Math.max(0, Math.min(melodyPages - 1, idx));
+      updatePagerUI();
+      drawAll();
+    }
+
+    function nextPage() { goToPage(pageIndex + 1); }
+    function prevPage() { goToPage(pageIndex - 1); }
+
+    // ===== Bar numbers =====
+    // Draw bars on FIRST beat (bar start). Here we draw 4 bars for the current page.
+    function drawBarNumbersForPage() {
+      barCtx.clearRect(0, 0, barCanvas.width, barCanvas.height);
+      barCtx.fillStyle = '#fff';
+      barCtx.fillRect(0, 0, barCanvas.width, barCanvas.height);
+
+      const startBar = pageIndex * pageBars; // zero-based
+
+      for (let b = 0; b < pageBars; b++) {
+        const globalBar = startBar + b; // zero-based
+        const localStep = b * stepsPerBar;
+        const x = localStep * melodyCellW;
+
+        // Bar divider
+        barCtx.strokeStyle = '#9fb5ff';
+        barCtx.lineWidth = 2;
+        barCtx.beginPath();
+        barCtx.moveTo(x, 0);
+        barCtx.lineTo(x, barCanvas.height);
+        barCtx.stroke();
+
+        // Bar number at first beat
+        barCtx.fillStyle = '#111';
+        barCtx.textAlign = 'left';
+        barCtx.textBaseline = 'middle';
+        barCtx.font = 'bold 13px Arial';
+        barCtx.fillText(String(globalBar + 1), x + 6, barCanvas.height / 2);
+      }
+
+      // right edge
+      barCtx.strokeStyle = '#e6e6e6';
+      barCtx.lineWidth = 1;
+      barCtx.beginPath();
+      barCtx.moveTo(pageSteps * melodyCellW, 0);
+      barCtx.lineTo(pageSteps * melodyCellW, barCanvas.height);
+      barCtx.stroke();
+
+      barCtx.lineWidth = 1;
+    }
+
+    function drawDrumBarNumbers() {
+      drumHeaderCtx.clearRect(0, 0, drumHeaderCanvas.width, drumHeaderCanvas.height);
+      drumHeaderCtx.fillStyle = '#fff';
+      drumHeaderCtx.fillRect(0, 0, drumHeaderCanvas.width, drumHeaderCanvas.height);
+
+      for (let bar = 0; bar < drumBars; bar++) {
+        const localStep = bar * stepsPerBar;
+        const x = localStep * drumCellW;
+
+        drumHeaderCtx.strokeStyle = '#9fb5ff';
+        drumHeaderCtx.lineWidth = 2;
+        drumHeaderCtx.beginPath();
+        drumHeaderCtx.moveTo(x, 0);
+        drumHeaderCtx.lineTo(x, drumHeaderCanvas.height);
+        drumHeaderCtx.stroke();
+
+        drumHeaderCtx.fillStyle = '#111';
+        drumHeaderCtx.textAlign = 'left';
+        drumHeaderCtx.textBaseline = 'middle';
+        drumHeaderCtx.font = 'bold 13px Arial';
+        drumHeaderCtx.fillText(String(bar + 1), x + 6, drumHeaderCanvas.height / 2);
+      }
+
+      // right edge
+      drumHeaderCtx.strokeStyle = '#e6e6e6';
+      drumHeaderCtx.lineWidth = 1;
+      drumHeaderCtx.beginPath();
+      drumHeaderCtx.moveTo(drumCols * drumCellW, 0);
+      drumHeaderCtx.lineTo(drumCols * drumCellW, drumHeaderCanvas.height);
+      drumHeaderCtx.stroke();
+
+      drumHeaderCtx.lineWidth = 1;
+    }
+
+    // ===== Audio: melody tone =====
+    function playTone(freq, startTime, duration) {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+
+      gain.gain.setValueAtTime(0, startTime);
+      gain.gain.linearRampToValueAtTime(0.8, startTime + Math.min(0.05, duration * 0.25));
+      gain.gain.linearRampToValueAtTime(0, startTime + duration);
+
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      osc.start(startTime);
+      osc.stop(startTime + duration + 0.02);
+    }
+
+    function previewMelody(note) {
+      const freq = frequencies[note];
+      if (typeof freq !== 'number') return;
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      playTone(freq, audioCtx.currentTime, 0.18);
+    }
+
+    // ===== Audio: drums =====
+    function noiseBuffer(durationSec = 0.2) {
+      const sampleRate = audioCtx.sampleRate;
+      const length = Math.max(1, Math.floor(sampleRate * durationSec));
+      const buffer = audioCtx.createBuffer(1, length, sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < length; i++) data[i] = Math.random() * 2 - 1;
+      return buffer;
+    }
+
+    function playKick(time) {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(140, time);
+      osc.frequency.exponentialRampToValueAtTime(50, time + 0.12);
+
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.exponentialRampToValueAtTime(1.0, time + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.25);
+
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(time);
+      osc.stop(time + 0.3);
+    }
+
+    function playSnare(time) {
+      const noise = audioCtx.createBufferSource();
+      noise.buffer = noiseBuffer(0.18);
+
+      const noiseFilter = audioCtx.createBiquadFilter();
+      noiseFilter.type = 'highpass';
+      noiseFilter.frequency.setValueAtTime(900, time);
+
+      const noiseGain = audioCtx.createGain();
+      noiseGain.gain.setValueAtTime(0.0001, time);
+      noiseGain.gain.exponentialRampToValueAtTime(0.9, time + 0.005);
+      noiseGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.15);
+
+      const osc = audioCtx.createOscillator();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(200, time);
+
+      const oscGain = audioCtx.createGain();
+      oscGain.gain.setValueAtTime(0.0001, time);
+      oscGain.gain.exponentialRampToValueAtTime(0.3, time + 0.005);
+      oscGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.12);
+
+      noise.connect(noiseFilter);
+      noiseFilter.connect(noiseGain);
+      noiseGain.connect(audioCtx.destination);
+
+      osc.connect(oscGain);
+      oscGain.connect(audioCtx.destination);
+
+      noise.start(time);
+      noise.stop(time + 0.2);
+      osc.start(time);
+      osc.stop(time + 0.15);
+    }
+
+    function playHiHat(time) {
+      const noise = audioCtx.createBufferSource();
+      noise.buffer = noiseBuffer(0.08);
+
+      const hp = audioCtx.createBiquadFilter();
+      hp.type = 'highpass';
+      hp.frequency.setValueAtTime(5000, time);
+
+      const gain = audioCtx.createGain();
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.exponentialRampToValueAtTime(0.6, time + 0.002);
+      gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.06);
+
+      noise.connect(hp);
+      hp.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      noise.start(time);
+      noise.stop(time + 0.09);
+    }
+
+    function previewDrum(rowIndex) {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const t = audioCtx.currentTime;
+      const name = drums[rowIndex];
+      if (name === 'Kick') playKick(t);
+      if (name === 'Snare') playSnare(t);
+      if (name === 'Hi-hat') playHiHat(t);
+    }
+
+    // ===== Drawing helpers =====
+    function paintBeatBands(ctx, totalSteps, cellW, height) {
+      for (let c = 0; c < totalSteps; c += beatSteps) {
+        const bandIndex = Math.floor(c / beatSteps);
+        ctx.fillStyle = (bandIndex % 2 === 0) ? '#ffffff' : '#f2f2f2';
+        ctx.fillRect(c * cellW, 0, beatSteps * cellW, height);
+      }
+    }
+
+    // ===== Draw melody page =====
+    function drawMelodyGrid(playheadGlobalStep = null) {
+      melodyCtx.clearRect(0, 0, melodyCanvas.width, melodyCanvas.height);
+      paintBeatBands(melodyCtx, pageSteps, melodyCellW, melodyCanvas.height);
+
+      const start = pageStartStep();
+
+      for (let r = 0; r < melodyRows; r++) {
+        for (let local = 0; local < pageSteps; local++) {
+          const global = start + local;
+
+          const isBarStart = (local % stepsPerBar === 0);
+          melodyCtx.strokeStyle = isBarStart ? '#9fb5ff' : '#ccc';
+          melodyCtx.lineWidth = isBarStart ? 2 : 1;
+          melodyCtx.strokeRect(local * melodyCellW, r * melodyCellH, melodyCellW, melodyCellH);
+
+          if (melodyData[r][global]) {
+            melodyCtx.fillStyle = '#4f7cff';
+            melodyCtx.fillRect(local * melodyCellW + 2, r * melodyCellH + 2, melodyCellW - 4, melodyCellH - 4);
+          }
+        }
+      }
+
+      // Playhead (only if it falls on this page)
+      if (playheadGlobalStep !== null && Number.isFinite(playheadGlobalStep)) {
+        const start = pageStartStep();
+        const end = start + pageSteps;
+        if (playheadGlobalStep >= start && playheadGlobalStep <= end) {
+          const local = playheadGlobalStep - start;
+          const x = Math.max(0, Math.min(melodyCanvas.width, local * melodyCellW));
+          melodyCtx.beginPath();
+          melodyCtx.moveTo(x, 0);
+          melodyCtx.lineTo(x, melodyCanvas.height);
+          melodyCtx.strokeStyle = '#ff3b30';
+          melodyCtx.lineWidth = 3;
+          melodyCtx.stroke();
+        }
+      }
+
+      melodyCtx.lineWidth = 1;
+    }
+
+    // ===== Draw drums (always 4 bars) =====
+    function drawDrumGrid(playheadDrumStep = null) {
+      drumCtx.clearRect(0, 0, drumCanvas.width, drumCanvas.height);
+      paintBeatBands(drumCtx, drumCols, drumCellW, drumCanvas.height);
+
+      for (let r = 0; r < drumRows; r++) {
+        for (let c = 0; c < drumCols; c++) {
+          const isBarStart = (c % stepsPerBar === 0);
+          drumCtx.strokeStyle = isBarStart ? '#9fb5ff' : '#ccc';
+          drumCtx.lineWidth = isBarStart ? 2 : 1;
+          drumCtx.strokeRect(c * drumCellW, r * drumCellH, drumCellW, drumCellH);
+
+          if (drumData[r][c]) {
+            drumCtx.fillStyle = '#4f7cff';
+            drumCtx.fillRect(c * drumCellW + 2, r * drumCellH + 2, drumCellW - 4, drumCellH - 4);
+          }
+        }
+      }
+
+      if (playheadDrumStep !== null && Number.isFinite(playheadDrumStep)) {
+        const x = Math.max(0, Math.min(drumCanvas.width, playheadDrumStep * drumCellW));
+        drumCtx.beginPath();
+        drumCtx.moveTo(x, 0);
+        drumCtx.lineTo(x, drumCanvas.height);
+        drumCtx.strokeStyle = '#ff3b30';
+        drumCtx.lineWidth = 3;
+        drumCtx.stroke();
+      }
+
+      drumCtx.lineWidth = 1;
+    }
+
+    // ===== Compute melody for playback =====
+    function computeMelodySteps() {
+      const out = [];
+      for (let c = 0; c < melodyColsTotal; c++) {
+        let found = false;
+        for (let r = 0; r < melodyRows; r++) {
+          if (melodyData[r][c]) {
+            out.push(notes[r]);
+            found = true;
+            break;
+          }
+        }
+        if (!found) out.push('REST');
+      }
+      return out;
+    }
+
+    // ===== Playback =====
+    function playAll() {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      stopPlayback();
+
+      const melodySteps = computeMelodySteps();
+      const stepDur = getStepDurationSeconds();
+
+      isPlaying = true;
+      playBtn.disabled = true;
+      stopBtn.disabled = false;
+      updatePagerUI(); // disables prev/next while playing
+
+      playStartAudio = audioCtx.currentTime;
+
+      // Schedule audio for full 16 bars
+      let t = playStartAudio;
+      for (let i = 0; i < melodyColsTotal; i++) {
+        // Melody
+        const m = melodySteps[i];
+        if (m !== 'REST') {
+          const freq = frequencies[m];
+          if (typeof freq === 'number') playTone(freq, t, stepDur * 0.9);
+        }
+
+        // Drums loop every 4 bars
+        const di = i % drumCols;
+        if (drumData[0][di]) playHiHat(t);
+        if (drumData[1][di]) playSnare(t);
+        if (drumData[2][di]) playKick(t);
+
+        t += stepDur;
+      }
+
+      animatePlayhead(stepDur);
+    }
+
+    function stopPlayback() {
+      isPlaying = false;
+      playBtn.disabled = false;
+      stopBtn.disabled = true;
+      if (animationId) {
+        cancelAnimationFrame(animationId);
+        animationId = null;
+      }
+      updatePagerUI();
+      drawAll();
+    }
+
+    function animatePlayhead(stepDur) {
+      const totalDuration = melodyColsTotal * stepDur;
+
+      const tick = () => {
+        if (!isPlaying) return;
+
+        const elapsed = audioCtx.currentTime - playStartAudio;
+        const head = elapsed / stepDur; // global step
+
+        // Auto-page so the melody view always aligns to the current 4-bar block
+        const desiredPage = Math.max(0, Math.min(melodyPages - 1, Math.floor(head / pageSteps)));
+        if (desiredPage !== pageIndex) {
+          pageIndex = desiredPage;
+          updatePagerUI();
+          drawBarNumbersForPage();
+        }
+
+        drawMelodyGrid(head);
+        drawDrumGrid(head % drumCols);
+
+        if (elapsed >= totalDuration) {
+          stopPlayback();
+          return;
+        }
+
+        animationId = requestAnimationFrame(tick);
+      };
+
+      animationId = requestAnimationFrame(tick);
+    }
+
+    // ===== Clear =====
+    function clearAll() {
+      stopPlayback();
+      for (let r = 0; r < melodyRows; r++) melodyData[r].fill(false);
+      for (let r = 0; r < drumRows; r++) drumData[r].fill(false);
+      drawAll();
+    }
+
+    // ===== Interaction: Melody (paged) =====
+    melodyCanvas.addEventListener('click', (e) => {
+      if (isPlaying) return;
+
+      const rect = melodyCanvas.getBoundingClientRect();
+      const localCol = Math.floor((e.clientX - rect.left) / melodyCellW);
+      const row = Math.floor((e.clientY - rect.top) / melodyCellH);
+
+      if (localCol < 0 || localCol >= pageSteps || row < 0 || row >= melodyRows) return;
+
+      const globalCol = pageStartStep() + localCol;
+
+      melodyData[row][globalCol] = !melodyData[row][globalCol];
+
+      // Monophonic per column (across all rows)
+      if (melodyData[row][globalCol]) {
+        for (let r = 0; r < melodyRows; r++) if (r !== row) melodyData[r][globalCol] = false;
+        previewMelody(notes[row]);
+      }
+
+      drawMelodyGrid();
+    });
+
+    // ===== Interaction: Drums (4 bars) =====
+    drumCanvas.addEventListener('click', (e) => {
+      if (isPlaying) return;
+
+      const rect = drumCanvas.getBoundingClientRect();
+      const col = Math.floor((e.clientX - rect.left) / drumCellW);
+      const row = Math.floor((e.clientY - rect.top) / drumCellH);
+
+      if (col < 0 || col >= drumCols || row < 0 || row >= drumRows) return;
+
+      drumData[row][col] = !drumData[row][col];
+      if (drumData[row][col]) previewDrum(row);
+      drawDrumGrid();
+    });
+
+    // ===== Range update (melody only) =====
+    function setRange(mode) {
+      const newNotes = (rangeModes[mode] || rangeModes.full).slice();
+      notes = newNotes;
+      melodyRows = notes.length;
+
+      melodyCanvas.height = rowH * melodyRows;
+      melodyCellW = melodyCanvas.width / pageSteps;
+      melodyCellH = melodyCanvas.height / melodyRows;
+
+      melodyData = Array.from({ length: melodyRows }, () => Array(melodyColsTotal).fill(false));
+
+      renderMelodyLabels();
+      drawBarNumbersForPage();
+      drawMelodyGrid();
+    }
+
+    // ===== Draw everything =====
+    function drawAll() {
+      renderMelodyLabels();
+      renderDrumLabels();
+      drawBarNumbersForPage();
+      drawDrumBarNumbers();
+      drawMelodyGrid();
+      drawDrumGrid();
+    }
+
+    // Initial
+    updatePagerUI();
+    drawAll();
+
+    // ===== Sanity checks =====
+    (function runSanityChecks() {
+      console.assert(melodyColsTotal === 256, 'melodyColsTotal should be 256 (16 bars)');
+      console.assert(pageSteps === 64, 'pageSteps should be 64 (4 bars)');
+      console.assert(drumCols === 64, 'drumCols should be 64 (4 bars)');
+      console.assert(melodyPages === 4, 'melodyPages should be 4 pages');
+    })();
+  </script>
+</body>
+</html>
